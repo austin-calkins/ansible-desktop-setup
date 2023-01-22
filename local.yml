@@ -1,0 +1,59 @@
+---
+- hosts: localhost
+  connection: local
+  become: true
+  roles:
+    - gantsign.visual-studio-code
+
+  tasks:
+  - name: install initial packages
+    package:
+      name:
+        - htop
+        - git
+        - tmux
+        - vim-nox
+        - wget
+        - gpg
+        - steam
+        - flatpak
+
+  - name: Add the flatpak remote to the system installation
+    community.general.flatpak_remote:
+      name: flathub
+      state: present
+      flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo  
+
+  - name: Install flatpak packages
+    community.general.flatpak:
+      name:
+        - com.discordapp.Discord
+        - com.jetbrains.IntelliJ-IDEA-Ultimate
+        - com.google.Chrome
+        - com.spotify.Client
+        - org.videolan.VLC
+  
+  - name: Install Snap packages
+    community.general.snap:
+      name:
+        - docker
+
+  - name: add ansible user
+    user:
+      name: ansible
+      system: yes
+
+  - name: set up sudo for ansible user
+    copy:
+      src: files/sudoer_ansible
+      dest: /etc/sudoers.d/ansible
+      owner: root
+      group: root
+      mode: 0440
+
+  # - name: add ansible-pull cron job
+  #   cron:
+  #     name: ansible auto-provision
+  #     user: ansible
+  #     minute: "*/10"
+  #     job: ansible-pull -o -U https://github.com/jlacroix82/ansible_pull_tutorial.git
