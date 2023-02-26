@@ -17,6 +17,7 @@
         - gpg
         - steam
         - flatpak
+        - filezilla
 
   - name: Add the flatpak remote to the system installation
     community.general.flatpak_remote:
