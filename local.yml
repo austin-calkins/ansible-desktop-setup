@@ -2,13 +2,9 @@
 - hosts: localhost
   connection: local
   become: true
-  roles:
-    - gantsign.visual-studio-code
-
-  tasks:
-  - name: install initial packages
-    package:
-      name:
+  vars:
+    package_names:
+      Debian:
         - htop
         - git
         - tmux
@@ -18,43 +14,81 @@
         - steam
         - flatpak
         - filezilla
+      Archlinux:
+        - htop
+        - git
+        - tmux
+        - vim
+        - wget
+        - gnupg
+        - steam
+        - flatpak
+        - filezilla
+  roles:
+    - role: gantsign.visual-studio-code
+      when: ansible_facts['os_family'] != 'Archlinux'
 
-  - name: Add the flatpak remote to the system installation
-    community.general.flatpak_remote:
-      name: flathub
-      state: present
-      flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo  
+  tasks:
+    - name: install initial packages
+      package:
+        name: "{{ package_names[ansible_facts['os_family']] | default(package_names['Debian']) }}"
+        state: present
 
-  - name: Install flatpak packages
-    community.general.flatpak:
-      name:
-        - com.discordapp.Discord
-        - com.jetbrains.IntelliJ-IDEA-Ultimate
-        - com.google.Chrome
-        - com.spotify.Client
-        - org.videolan.VLC
-  
-  - name: Install Snap packages
-    community.general.snap:
-      name:
-        - docker
+    - name: Add the flatpak remote to the system installation
+      community.general.flatpak_remote:
+        name: flathub
+        state: present
+        flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo
 
-  - name: add ansible user
-    user:
-      name: ansible
-      system: yes
+    - name: Install flatpak packages
+      community.general.flatpak:
+        name:
+          - com.discordapp.Discord
+          - com.jetbrains.IntelliJ-IDEA-Ultimate
+          - com.google.Chrome
+          - com.spotify.Client
+          - org.videolan.VLC
+          - com.visualstudio.code
 
-  - name: set up sudo for ansible user
-    copy:
-      src: files/sudoer_ansible
-      dest: /etc/sudoers.d/ansible
-      owner: root
-      group: root
-      mode: 0440
+    - name: Install Snap packages
+      community.general.snap:
+        name:
+          - docker
+      when: ansible_facts['os_family'] != 'Archlinux'
 
-  - name: add ansible-pull cron job
-    cron:
-      name: ansible auto-provision
-      user: ansible
-      minute: "*/10"
-      job: ansible-pull -o -U https://github.com/austin-calkins/ansible-desktop-setup.git
+    - name: Install Docker package on Arch-based systems
+      package:
+        name:
+          - docker
+        state: present
+      when: ansible_facts['os_family'] == 'Archlinux'
+
+    - name: add ansible user
+      user:
+        name: ansible
+        system: yes
+
+    - name: set up sudo for ansible user
+      copy:
+        src: files/sudoer_ansible
+        dest: /etc/sudoers.d/ansible
+        owner: root
+        group: root
+        mode: 0440
+
+    - name: ensure ansible user has a cron directory
+      file:
+        path: /var/spool/cron
+        state: directory
+        owner: ansible
+        group: ansible
+        mode: 0755
+
+    - name: add ansible-pull cron job
+      copy:
+        dest: /var/spool/cron/ansible
+        owner: ansible
+        group: ansible
+        mode: 0600
+        content: |
+          */10 * * * * ansible-pull -o -U https://github.com/austin-calkins/ansible-desktop-setup.git
